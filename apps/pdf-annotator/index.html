@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro PDF Annotator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div id="toolbar">
+        <div class="tool-group">
+            <input type="file" id="file-input" accept=".pdf" style="display:none">
+            <button id="btn-upload" title="Open PDF"><i class="fas fa-folder-open"></i></button>
+        </div>
+
+        <div class="tool-group">
+            <button id="btn-undo" title="Undo"><i class="fas fa-rotate-left"></i></button>
+            <button id="btn-redo" title="Redo"><i class="fas fa-rotate-right"></i></button>
+        </div>
+
+        <div class="tool-group">
+            <button id="btn-grid-view" title="Toggle Thumbnails"><i class="fas fa-th-large"></i></button>
+            <button id="btn-prev"><i class="fas fa-chevron-left"></i></button>
+            <span id="page-num">-- / --</span>
+            <button id="btn-next"><i class="fas fa-chevron-right"></i></button>
+        </div>
+
+        <div class="tool-group">
+            <button id="btn-fit" class="active" title="Fit to Screen">Fit</button>
+            <button id="btn-zoom-in"><i class="fas fa-search-plus"></i></button>
+            <button id="btn-zoom-out"><i class="fas fa-search-minus"></i></button>
+        </div>
+
+        <div class="tool-group">
+            <button class="tool-btn active" data-tool="select" id="btn-select" title="Select Text (S)"><i class="fas fa-mouse-pointer"></i></button>
+            <button class="tool-btn" data-tool="draw" id="btn-draw" title="Draw (D)"><i class="fas fa-pen"></i></button>
+            <button class="tool-btn" data-tool="eraser" id="btn-eraser" title="Eraser (E)"><i class="fas fa-eraser"></i></button>
+            <button class="tool-btn" data-tool="note" id="btn-note" title="Sticky Note (N)"><i class="fas fa-sticky-note"></i></button>
+        </div>
+
+        <div class="tool-group" id="pen-controls">
+            <button id="btn-highlighter" title="Highlighter (H)"><i class="fas fa-highlighter"></i></button>
+            <div class="color-swatch active" style="background-color: #000000;" data-color="#000000"></div>
+            <div class="color-swatch" style="background-color: #ef4444;" data-color="#ef4444"></div>
+            <div class="color-swatch" style="background-color: #3b82f6;" data-color="#3b82f6"></div>
+            <div class="color-swatch" style="background-color: #10b981;" data-color="#10b981"></div>
+        </div>
+
+        <div class="tool-group tool-settings">
+            <div class="slider-container">
+                <label>Size</label><input type="range" id="input-size" min="1" max="50" value="2">
+            </div>
+            <div class="slider-container">
+                <label>Opacity</label><input type="range" id="input-opacity" min="10" max="100" value="100">
+            </div>
+        </div>
+
+        <div class="tool-group">
+            <select id="layout-select">
+                <option value="floating">Floating Notes</option>
+                <option value="right">Dock Right</option>
+                <option value="left">Dock Left</option>
+                <option value="top">Dock Top</option>
+                <option value="bottom">Dock Bottom</option>
+            </select>
+        </div>
+        
+        <div class="tool-group">
+            <button id="btn-theme" title="App Dark Mode"><i class="fas fa-moon"></i> UI</button>
+            <button id="btn-invert" title="Invert PDF Colors"><i class="fas fa-adjust"></i> PDF</button>
+            <button id="btn-shortcuts" title="Keyboard Shortcuts"><i class="fas fa-keyboard"></i></button>
+        </div>
+
+        <div class="tool-group">
+            <button id="btn-save" title="Save Session (JSON)"><i class="fas fa-save"></i></button>
+            <input type="file" id="import-input" accept=".json" style="display:none">
+            <button id="btn-load" title="Load Session"><i class="fas fa-folder-open"></i></button>
+            
+            <button id="btn-export-image" title="Export Image"><i class="fas fa-image"></i></button>
+            <button id="btn-export-pdf" title="Export PDF"><i class="fas fa-file-pdf"></i></button>
+            <button id="btn-export-md" title="Export Markdown (ZIP)"><i class="fab fa-markdown"></i></button>
+            
+            <button id="btn-clear" title="Clear Page"><i class="fas fa-trash"></i></button>
+        </div>
+    </div>
+
+    <div id="app-body">
+        <div id="thumbnail-sidebar" class="hidden"></div>
+        <div id="panel-left" class="notes-panel"><h3>Notes</h3><div id="container-left"></div></div>
+        <div id="center-stage">
+            <div id="panel-top" class="notes-panel"><h3>Notes</h3><div id="container-top" style="display:flex;gap:10px;flex-wrap:wrap"></div></div>
+            <div id="pdf-viewport">
+                <div id="page-wrapper">
+                    <canvas id="pdf-render" class="pdf-canvas"></canvas>
+                    <div id="text-layer" class="textLayer"></div>
+                    <canvas id="draw-layer"></canvas>
+                    <div id="notes-layer"></div>
+                </div>
+            </div>
+            <div id="panel-bottom" class="notes-panel"><h3>Notes</h3><div id="container-bottom" style="display:flex;gap:10px;flex-wrap:wrap"></div></div>
+        </div>
+        <div id="panel-right" class="notes-panel"><h3>Notes</h3><div id="container-right"></div></div>
+    </div>
+
+    <div id="shortcuts-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Keyboard Shortcuts</h2>
+                <span id="btn-close-shortcuts" class="close-modal">&times;</span>
+            </div>
+            <div class="shortcut-grid">
+                <div class="shortcut-category">
+                    <h3>Tools</h3>
+                    <div class="key-row"><span>Select Tool</span> <kbd>S</kbd></div>
+                    <div class="key-row"><span>Draw Tool</span> <kbd>D</kbd></div>
+                    <div class="key-row"><span>Eraser</span> <kbd>E</kbd></div>
+                    <div class="key-row"><span>Sticky Note</span> <kbd>N</kbd></div>
+                    <div class="key-row"><span>Highlighter</span> <kbd>H</kbd></div>
+                </div>
+                <div class="shortcut-category">
+                    <h3>Navigation</h3>
+                    <div class="key-row"><span>Next Page</span> <div class="combo"><kbd>→</kbd> / <kbd>F</kbd></div></div>
+                    <div class="key-row"><span>Prev Page</span> <div class="combo"><kbd>←</kbd> / <kbd>B</kbd></div></div>
+                    <div class="key-row"><span>Scroll Page</span> <span>Mouse Wheel</span></div>
+                </div>
+                <div class="shortcut-category">
+                    <h3>Actions</h3>
+                    <div class="key-row"><span>Undo</span> <div class="combo"><kbd>Ctrl</kbd>+<kbd>Z</kbd></div></div>
+                    <div class="key-row"><span>Redo</span> <div class="combo"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>if (window.location.protocol === 'file:') alert("Please run on localhost.");</script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

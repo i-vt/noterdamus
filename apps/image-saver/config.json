@@ -1,0 +1,6 @@
+{
+  "uploadDir": "local-upload-dir/",
+  "imageBasePath": "./images/",
+  "imageEndpointPrefix": "webupload",
+  "serverPort": 18754
+}

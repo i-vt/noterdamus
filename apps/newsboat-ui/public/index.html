@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en" :class="theme" x-data="newsApp()">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsboat Web</title>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        // Custom Palette
+                        rich: '#0a0a0a',       // Main background (Rich Black)
+                        oil: '#171717',        // Panels/Sidebars (Oil Black)
+                        'oil-light': '#262626',// Borders/Hovers
+                        'mute-orange': '#9a3412', // Dark Mute Orange (Active/Accents)
+                        'bright-orange': '#f97316', // Text Highlights
+                    },
+                    typography: (theme) => ({
+                        DEFAULT: {
+                            css: {
+                                '--tw-prose-body': theme('colors.gray.700'),
+                                '--tw-prose-headings': theme('colors.gray.900'),
+                                '--tw-prose-links': theme('colors.mute-orange'),
+                                '--tw-prose-invert-body': theme('colors.gray.300'),
+                                '--tw-prose-invert-headings': theme('colors.white'),
+                                '--tw-prose-invert-links': theme('colors.bright-orange'),
+                            },
+                        },
+                    }),
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #525252; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #737373; }
+        
+        .dark ::-webkit-scrollbar-thumb { background: #333; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-rich text-gray-800 dark:text-gray-300 h-screen w-screen overflow-hidden flex flex-col transition-colors duration-300" 
+      @keydown.window="handleKeydown($event)">
+
+    <header class="h-14 bg-white dark:bg-oil border-b border-gray-200 dark:border-oil-light flex items-center justify-between px-4 shrink-0 z-20 shadow-sm transition-colors duration-300">
+        <div class="flex items-center gap-4">
+            <h1 class="text-lg font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                <span class="bg-mute-orange text-white text-xs px-2 py-0.5 rounded-sm">NB</span>
+                Newsboat
+            </h1>
+            
+            <div class="flex items-center gap-3 text-xs font-mono bg-gray-50 dark:bg-oil-light border border-gray-200 dark:border-white/10 rounded-md px-3 py-1 select-none text-gray-600 dark:text-gray-400"
+                 title="Queue / Active / Total Cached">
+                
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full transition-colors duration-300" 
+                          :class="sysStatus.queueLength > 0 ? 'bg-orange-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'"></span>
+                    <span x-text="'Q: ' + sysStatus.queueLength"></span>
+                </div>
+
+                <span class="text-gray-300 dark:text-gray-600">|</span>
+
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full transition-colors duration-300"
+                          :class="sysStatus.activeCrawls > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'"></span>
+                    <span x-text="'Act: ' + sysStatus.activeCrawls"></span>
+                </div>
+                
+                <span class="text-gray-300 dark:text-gray-600">|</span>
+                
+                <span x-text="'Saved: ' + sysStatus.totalCached"></span>
+                
+                <span class="text-gray-300 dark:text-gray-600" x-show="sysStatus.totalFailed > 0">|</span>
+                <span class="text-red-500" x-show="sysStatus.totalFailed > 0" x-text="'Err: ' + sysStatus.totalFailed"></span>
+            </div>
+
+            <button @click="toggleFetchAll()" 
+                class="text-xs font-medium px-3 py-1 rounded-md border transition-all focus:outline-none ml-2"
+                :class="fetchAll ? 'bg-oil text-white border-oil dark:bg-white dark:text-rich' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-oil dark:border-oil-light dark:text-gray-400 dark:hover:bg-oil-light'">
+                <span x-text="fetchAll ? 'All Articles' : 'Unread Only'"></span>
+            </button>
+        </div>
+
+        <div class="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 font-mono">
+            <span class="hidden md:inline hover:text-gray-600 dark:hover:text-gray-300 transition cursor-help" title="Use Arrow Keys">nav</span>
+            <span class="hidden md:inline hover:text-gray-600 dark:hover:text-gray-300 transition cursor-help" title="Press P">preview</span>
+            <span class="hidden md:inline hover:text-gray-600 dark:hover:text-gray-300 transition cursor-help" title="Shift + P">refetch</span>
+            
+            <button @click="loadArticles()" class="text-gray-500 dark:text-gray-400 hover:text-mute-orange dark:hover:text-bright-orange transition p-1 rounded-md hover:bg-orange-50 dark:hover:bg-oil-light">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
+
+            <button @click="toggleTheme()" class="text-gray-500 dark:text-gray-400 hover:text-mute-orange dark:hover:text-bright-orange transition p-1 rounded-md hover:bg-orange-50 dark:hover:bg-oil-light">
+                <svg x-show="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <svg x-show="theme === 'light'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        
+        <aside class="w-[400px] flex-shrink-0 bg-white dark:bg-oil border-r border-gray-200 dark:border-oil-light overflow-y-auto flex flex-col z-10 transition-colors duration-300" id="articleList">
+            <template x-if="loading">
+                <div class="p-8 text-center text-sm text-gray-400 animate-pulse">Syncing...</div>
+            </template>
+
+            <template x-for="(article, index) in articles" :key="article.id">
+                <div @click="selectArticle(index)" 
+                     :id="'article-' + index"
+                     class="group relative p-4 border-b border-gray-100 dark:border-oil-light cursor-pointer transition-all duration-150 select-none"
+                     :class="{
+                        'bg-orange-50 dark:bg-white/5 border-l-4 border-l-mute-orange pl-3': activeIndex === index,
+                        'border-l-4 border-l-transparent hover:bg-gray-50 dark:hover:bg-oil-light': activeIndex !== index,
+                        'opacity-60': article.unread === 0 && activeIndex !== index
+                     }">
+                    
+                    <div class="flex justify-between items-baseline mb-1">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-500 truncate max-w-[200px]" 
+                              x-text="getDomain(article.feedurl)"></span>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-600 whitespace-nowrap ml-2" 
+                              x-text="formatDateShort(article.pubDate)"></span>
+                    </div>
+                    
+                    <h3 class="text-sm leading-snug mb-1 transition-colors line-clamp-2"
+                        :class="{
+                            'font-bold text-gray-900 dark:text-gray-100': article.unread === 1, 
+                            'font-medium text-gray-700 dark:text-gray-400': article.unread === 0,
+                            'text-mute-orange dark:text-bright-orange': activeIndex === index
+                        }" 
+                        x-text="article.title"></h3>
+                </div>
+            </template>
+        </aside>
+
+        <main class="flex-1 bg-gray-50 dark:bg-rich overflow-y-auto relative scroll-smooth flex flex-col transition-colors duration-300" id="mainReader">
+            
+            <template x-if="!selectedArticle">
+                <div class="flex flex-col items-center justify-center h-full text-gray-300 dark:text-oil-light select-none">
+                    <p class="text-sm font-medium text-gray-400 dark:text-gray-600">Select an article to read</p>
+                </div>
+            </template>
+
+            <template x-if="selectedArticle">
+                <div class="flex flex-col min-h-full">
+                    
+                    <div class="sticky top-0 z-30 bg-white/90 dark:bg-oil/90 backdrop-blur border-b border-gray-200 dark:border-oil-light px-6 py-3 flex items-center justify-between shadow-sm transition-colors duration-300">
+                        <div class="flex bg-gray-100 dark:bg-oil-light p-1 rounded-lg select-none">
+                            <button @click="switchToView('feed')" 
+                                    class="px-4 py-1.5 text-xs font-bold rounded-md transition-all duration-200"
+                                    :class="viewMode === 'feed' ? 'bg-white dark:bg-oil text-gray-800 dark:text-gray-200 shadow-sm' : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                                Feed
+                            </button>
+                            
+                            <button @click="switchToView('reader')" 
+                                    class="px-4 py-1.5 text-xs font-bold rounded-md transition-all duration-200 flex items-center gap-2"
+                                    :class="viewMode === 'reader' ? 'bg-white dark:bg-oil text-mute-orange dark:text-bright-orange shadow-sm' : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                                <span x-show="cached && viewMode !== 'reader'" class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                Reader
+                            </button>
+                            
+                            <button @click="switchToView('shot')" 
+                                    class="px-4 py-1.5 text-xs font-bold rounded-md transition-all duration-200 flex items-center gap-2"
+                                    :class="viewMode === 'shot' ? 'bg-white dark:bg-oil text-mute-orange dark:text-bright-orange shadow-sm' : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                                <span x-show="cached && viewMode !== 'shot'" class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                Shot
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                             <a :href="selectedArticle.url" target="_blank" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Open Original">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </a>
+                            <button @click="fetchContent(true)" title="Force Refetch (Shift+P)" class="text-gray-400 hover:text-mute-orange dark:hover:text-bright-orange">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <article x-show="viewMode === 'feed'" class="max-w-3xl mx-auto w-full bg-white dark:bg-oil shadow-sm border-x border-gray-100 dark:border-oil-light min-h-screen transition-colors duration-300">
+                        <div class="px-8 pt-10 pb-6 border-b border-gray-100 dark:border-oil-light">
+                            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4" x-text="selectedArticle.title"></h1>
+                            <div class="text-sm text-gray-500 dark:text-gray-400 flex gap-2">
+                                <span x-text="selectedArticle.author || 'Unknown'"></span>
+                                <span>•</span>
+                                <span x-text="formatDateLong(selectedArticle.pubDate)"></span>
+                            </div>
+                        </div>
+                        <div class="prose prose-slate dark:prose-invert prose-lg max-w-none px-8 py-8" x-html="selectedArticle.content"></div>
+                    </article>
+
+                    <div x-show="viewMode === 'reader'" class="max-w-3xl mx-auto w-full bg-white dark:bg-oil shadow-sm border-x border-gray-100 dark:border-oil-light min-h-screen transition-colors duration-300">
+                        <div x-show="crawling" class="py-20 flex flex-col items-center">
+                            <svg class="animate-spin h-8 w-8 text-mute-orange mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <span class="text-gray-500 dark:text-gray-400">Generating Reader View...</span>
+                        </div>
+                        
+                        <div x-show="!crawling && previewMarkdown" class="prose prose-slate dark:prose-invert prose-lg max-w-none px-8 py-8" x-html="renderMarkdown(previewMarkdown)"></div>
+                        
+                        <div x-show="!crawling && !previewMarkdown" class="p-10 text-center text-gray-400 dark:text-gray-500">
+                            <p class="mb-2">Content not fetched yet.</p>
+                            <button @click="fetchContent(false)" class="text-mute-orange dark:text-bright-orange hover:underline">Load Content</button>
+                        </div>
+                    </div>
+
+                    <div x-show="viewMode === 'shot'" class="w-full bg-gray-200 dark:bg-oil-light min-h-screen flex justify-center transition-colors duration-300">
+                        <div x-show="crawling" class="py-20 flex flex-col items-center">
+                            <svg class="animate-spin h-8 w-8 text-mute-orange mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <span class="text-gray-500 dark:text-gray-400">Taking Screenshot...</span>
+                        </div>
+
+                        <img x-show="!crawling && previewImage" :src="previewImage" class="max-w-full h-auto shadow-lg" />
+                    </div>
+
+                </div>
+            </template>
+        </main>
+    </div>
+
+    <script>
+        function newsApp() {
+            return {
+                // Theme Logic
+                theme: localStorage.getItem('theme') || 'dark', // Default to Dark
+                
+                toggleTheme() {
+                    this.theme = this.theme === 'dark' ? 'light' : 'dark';
+                    localStorage.setItem('theme', this.theme);
+                },
+
+                articles: [],
+                activeIndex: -1,
+                selectedArticle: null,
+                loading: true,
+                fetchAll: false,
+                
+                // View State
+                viewMode: 'feed', 
+                lastReaderMode: 'reader',
+                cached: false,
+                crawling: false,
+                
+                // Data
+                previewImage: null,
+                previewMarkdown: null,
+                
+                // Cache & Network Controls
+                memCache: {},
+                fetchController: null,
+                
+                // System Status
+                sysStatus: { queueLength: 0, activeCrawls: 0, totalCached: 0, totalFailed: 0 },
+
+                init() {
+                    this.loadArticles();
+                    // Poll status every 3 seconds
+                    setInterval(() => this.pollStatus(), 3000);
+                    this.pollStatus();
+                },
+                
+                async pollStatus() {
+                    try {
+                        const res = await fetch('/api/status');
+                        this.sysStatus = await res.json();
+                    } catch (e) {
+                        // Silent fail for polling
+                    }
+                },
+
+                async loadArticles() {
+                    this.loading = true;
+                    try {
+                        const res = await fetch(`/api/articles?limit=100&all=${this.fetchAll}`);
+                        this.articles = await res.json();
+                    } catch (e) { console.error(e); } 
+                    finally { this.loading = false; }
+                },
+
+                async toggleFetchAll() {
+                    this.fetchAll = !this.fetchAll;
+                    this.activeIndex = -1;
+                    this.selectedArticle = null;
+                    await this.loadArticles();
+                },
+
+                async selectArticle(index) {
+                    if (index < 0 || index >= this.articles.length) return;
+
+                    // 1. Cancel any pending request immediately
+                    if (this.fetchController) {
+                        this.fetchController.abort();
+                        this.fetchController = null;
+                    }
+
+                    this.activeIndex = index;
+                    this.selectedArticle = this.articles[index];
+                    const currentId = this.selectedArticle.id;
+                    
+                    // 2. Clear state immediately to prevent flashing
+                    this.viewMode = 'feed'; 
+                    this.cached = false;
+                    this.previewImage = null;
+                    this.previewMarkdown = null;
+                    this.crawling = false;
+
+                    // Mark as read in DB
+                    if (this.selectedArticle.unread === 1) {
+                        this.markAsRead(this.selectedArticle);
+                    }
+                    
+                    this.$nextTick(() => {
+                        const el = document.getElementById('article-' + index);
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        document.getElementById('mainReader').scrollTop = 0;
+                    });
+
+                    // 3. Check cache, but verify ID before applying results
+                    await this.checkCache(this.selectedArticle.url, currentId);
+                },
+
+                async checkCache(url, intendedId) {
+                    if (!this.selectedArticle || this.selectedArticle.id !== intendedId) return;
+
+                    // 1. Check Memory Cache
+                    if (this.memCache[url]) {
+                        this.cached = true;
+                        this.previewImage = this.memCache[url].image;
+                        this.previewMarkdown = this.memCache[url].markdown;
+                        this.viewMode = this.lastReaderMode;
+                        return;
+                    }
+
+                    // 2. Check Server Cache (Lightweight)
+                    try {
+                        const res = await fetch(`/api/cache?url=${encodeURIComponent(url)}`);
+                        const data = await res.json();
+                        
+                        if (!this.selectedArticle || this.selectedArticle.id !== intendedId) return;
+
+                        if (data.cached) {
+                            this.cached = true;
+                            this.viewMode = this.lastReaderMode;
+                            this.fetchContent(false); 
+                        }
+                    } catch (e) { console.error(e); }
+                },
+
+                async switchToView(mode) {
+                    this.viewMode = mode;
+                    if (mode === 'reader' || mode === 'shot') {
+                        this.lastReaderMode = mode;
+                        if (!this.previewMarkdown) {
+                            await this.fetchContent(false);
+                        }
+                    }
+                },
+
+                toggleViewKey() {
+                    if (this.viewMode === 'feed') {
+                        this.switchToView(this.lastReaderMode);
+                    } else {
+                        this.switchToView('feed');
+                    }
+                },
+
+                async fetchContent(force = false) {
+                    if (!this.selectedArticle) return;
+                    
+                    if (this.fetchController) {
+                        this.fetchController.abort();
+                    }
+                    this.fetchController = new AbortController();
+                    const signal = this.fetchController.signal;
+
+                    this.crawling = true;
+                    const url = this.selectedArticle.url;
+                    const currentId = this.selectedArticle.id;
+                    
+                    try {
+                        const res = await fetch('/api/crawl', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: url, force: force }),
+                            signal: signal 
+                        });
+                        const data = await res.json();
+                        
+                        if (this.selectedArticle && this.selectedArticle.id === currentId && !signal.aborted) {
+                            if (data.success) {
+                                this.previewImage = data.image;
+                                this.previewMarkdown = data.markdown;
+                                this.cached = true;
+                                this.memCache[url] = { image: data.image, markdown: data.markdown };
+                            } else {
+                                // Don't alert on error if it was just a background queue promotion
+                                if (!data.error.includes("Promoting")) {
+                                     alert("Crawler Error: " + (data.error || 'Unknown'));
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        if (e.name !== 'AbortError') {
+                            console.error(e);
+                            alert("Network Error");
+                        }
+                    } finally {
+                        if (this.selectedArticle && this.selectedArticle.id === currentId) {
+                            this.crawling = false;
+                        }
+                        this.fetchController = null;
+                    }
+                },
+
+                renderMarkdown(md) { return marked.parse(md || ''); },
+
+                async markAsRead(article) {
+                    article.unread = 0;
+                    try { await fetch(`/api/articles/${article.id}/read`, { method: 'POST' }); } catch(e){}
+                },
+
+                handleKeydown(e) {
+                    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+                    const key = e.key.toLowerCase();
+                    const shift = e.shiftKey;
+                    const reader = document.getElementById('mainReader');
+
+                    // 1. Navigation
+                    if (key === 'arrowright' || (!shift && key === 'j')) {
+                        const next = this.activeIndex + 1;
+                        if (next < this.articles.length) this.selectArticle(next);
+                    } 
+                    else if (key === 'arrowleft' || (!shift && key === 'k')) {
+                        const prev = this.activeIndex - 1;
+                        if (prev >= 0) this.selectArticle(prev);
+                    }
+                    
+                    // 2. View Switching
+                    else if (key === 'p') {
+                        if (shift) this.fetchContent(true); 
+                        else this.toggleViewKey(); 
+                    }
+
+                    // 3. Scrolling
+                    else if (key === 'arrowdown' || (shift && key === 'j')) {
+                        e.preventDefault();
+                        reader.scrollBy({ top: 150, behavior: 'smooth' });
+                    }
+                    else if (key === 'arrowup' || (shift && key === 'k')) {
+                        e.preventDefault();
+                        reader.scrollBy({ top: -150, behavior: 'smooth' });
+                    }
+                    else if (key === ' ' || key === 'space') {
+                        e.preventDefault();
+                        const amount = reader.clientHeight * 0.8;
+                        reader.scrollBy({ top: shift ? -amount : amount, behavior: 'smooth' });
+                    }
+                },
+
+                formatDateShort(ts) {
+                    if (!ts) return '';
+                    return new Date(ts * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' });
+                },
+
+                formatDateLong(ts) {
+                    if (!ts) return '';
+                    return new Date(ts * 1000).toLocaleString();
+                },
+
+                getDomain(url) {
+                    try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'Feed'; }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

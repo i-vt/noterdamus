@@ -1,0 +1,11 @@
+{
+  "name": "pdf-annotator",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "http-server": "^14.1.1"
+  }
+}

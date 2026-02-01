@@ -1,0 +1,20 @@
+{
+  "name": "my-tools-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "start": "dotenv -- concurrently \"npm run start:image\" \"npm run start:pdf\" \"npm run start:news\"",
+    
+    "start:image": "cross-env-shell PORT=$PORT_IMAGE npm run start --workspace=apps/image-saver",
+    "start:pdf":   "cross-env-shell PORT=$PORT_PDF   npm run start --workspace=apps/pdf-annotator",
+    "start:news":  "cross-env-shell PORT=$PORT_NEWS  npm run start --workspace=apps/newsboat-ui"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0",
+    "dotenv-cli": "^11.0.0"
+  }
+}

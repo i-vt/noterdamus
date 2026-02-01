@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipboard & Drag-Drop Image Upload</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1E1E1E;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #E0E0E0;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #4CAF50;
+        }
+
+        /* NEW: Drop Zone Styles */
+        #drop-zone {
+            width: 80%;
+            max-width: 600px;
+            padding: 40px;
+            margin: 20px auto;
+            border: 2px dashed #444;
+            border-radius: 10px;
+            text-align: center;
+            color: #888;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background-color: #252525;
+        }
+
+        #drop-zone.drag-over {
+            border-color: #4CAF50;
+            background-color: #2a3a2a;
+            color: #FFF;
+        }
+
+        #drop-zone p {
+            margin: 0;
+            font-size: 1.1rem;
+            pointer-events: none; /* Prevents text selection while dragging */
+        }
+
+        #status {
+            font-size: 1rem;
+            color: #BBB;
+            margin-top: 10px;
+            text-align: center;
+            min-height: 1.2em;
+        }
+
+        img {
+            max-width: 100%;
+            max-height: 400px;
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #444;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .format-container {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #2D2D2D;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            width: 80%;
+            max-width: 600px;
+            display: none;
+            text-align: left;
+            margin: 0 auto;
+        }
+
+        .format-container h3 {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            color: #E0E0E0;
+        }
+
+        table {
+            width: 100%;
+            border-spacing: 10px;
+            border-collapse: collapse;
+        }
+
+        td {
+            padding: 8px;
+            vertical-align: top;
+        }
+
+        td strong {
+            display: block;
+            color: #4CAF50;
+            cursor: pointer;
+        }
+
+        .format-wrapper {
+            position: relative;
+            display: block;
+        }
+
+        .format-wrapper span {
+            display: block;
+            background-color: #333;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            color: #FFF;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 0.6rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #CCC;
+            border: none;
+            border-radius: 3px;
+            padding: 2px 6px;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.3s;
+        }
+
+        .copy-btn:hover {
+            opacity: 1;
+        }
+
+        .format-container strong:focus {
+            outline: 2px solid #4CAF50;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        #download-all {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        #download-all:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Upload Image</h1>
+    </header>
+
+    <main>
+        <div class="button-container">
+            <button id="download-all" onclick="downloadAllImages()">
+                Download All Images (.zip)
+            </button>
+        </div>
+
+        <div id="drop-zone">
+            <p>Drag & Drop image here<br><span style="font-size: 0.8em; color: #666;">or Paste (CTRL+V)</span></p>
+        </div>
+
+        <div id="status">Waiting for image...</div>
+
+        <section id="formats" class="format-container">
+            <h3>Image Formats (Click to Copy)</h3>
+
+            <table>
+                <tr>
+                    <td><strong id="markdown-copy" tabindex="0" onclick="copyToClipboard('markdown-format')">Markdown Format</strong></td>
+                    <td>
+                        <div class="format-wrapper">
+                            <button class="copy-btn" onclick="copyToClipboard('markdown-format', this)">Copy</button>
+                            <span id="markdown-format"></span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong id="html-copy" tabindex="0" onclick="copyToClipboard('html-format')">HTML Format</strong></td>
+                    <td>
+                        <div class="format-wrapper">
+                            <button class="copy-btn" onclick="copyToClipboard('html-format', this)">Copy</button>
+                            <span id="html-format"></span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong id="url-copy" tabindex="0" onclick="copyToClipboard('url-format')">URL Format</strong></td>
+                    <td>
+                        <div class="format-wrapper">
+                            <button class="copy-btn" onclick="copyToClipboard('url-format', this)">Copy</button>
+                            <span id="url-format"></span>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <img id="image" style="display: none;" alt="Uploaded Image" />
+        </section>
+    </main>
+
+<script>
+    let imageBasePath = '/images/';           
+    let imageEndpointPrefix = 'uploads';      
+    let configReady = false;
+
+    // Fetch config values from backend
+    fetch('/config')
+        .then(res => res.json())
+        .then(cfg => {
+            if (cfg.imageBasePath) imageBasePath = cfg.imageBasePath;
+            if (cfg.imageEndpointPrefix) imageEndpointPrefix = cfg.imageEndpointPrefix.replace(/^\/+|\/+$/g, '');
+        })
+        .catch(() => console.warn('Falling back to default config values.'))
+        .finally(() => configReady = true);
+
+    // --- Core Upload Logic ---
+    async function uploadImage(file) {
+        if (!configReady) {
+            document.getElementById('status').textContent = 'Config is still loading. Please wait...';
+            return;
+        }
+        
+        document.getElementById('status').textContent = 'Uploading...';
+        
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                const filename = data.filename;
+                const previewUrl = `/${imageEndpointPrefix}/${filename}`;
+                const publicPath = `${imageBasePath}${filename}`;
+
+                // Update Image Preview
+                const img = document.getElementById('image');
+                img.src = previewUrl;
+                img.alt = filename;
+                img.style.display = 'block';
+                
+                document.getElementById('status').textContent = 'Image uploaded successfully: ' + filename;
+
+                // Update Formats
+                document.getElementById('markdown-format').textContent = `![ThisTextWillShowUpIfImageCannotBeloaded](${publicPath} "TitleTextUsuallyVisible")`;
+                document.getElementById('html-format').textContent = `<img src="${publicPath}" alt="Uploaded Image">`;
+                document.getElementById('url-format').textContent = publicPath;
+
+                document.getElementById('formats').style.display = 'block';
+            } else {
+                document.getElementById('status').textContent = 'Upload failed: ' + (data.message || 'Unknown error');
+            }
+        } catch (error) {
+            document.getElementById('status').textContent = 'Error: ' + error.message;
+        }
+    }
+
+    // --- Paste Event Listener ---
+    document.addEventListener('paste', function (e) {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image')) {
+                const image = items[i].getAsFile();
+                uploadImage(image);
+                break;
+            }
+        }
+    });
+
+    // --- Drag and Drop Logic ---
+    const dropZone = document.getElementById('drop-zone');
+
+    // Highlight drop zone when dragging over
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    // Remove highlight when dragging leaves
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+    });
+
+    // Handle Drop
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            // Check if the first file is an image
+            if (files[0].type.startsWith('image/')) {
+                uploadImage(files[0]);
+            } else {
+                document.getElementById('status').textContent = 'Error: Please drop an image file.';
+            }
+        }
+    });
+
+    // Click to select file (optional convenience)
+    dropZone.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            if (e.target.files.length > 0) {
+                uploadImage(e.target.files[0]);
+            }
+        };
+        input.click();
+    });
+
+    // --- Utilities ---
+    function copyToClipboard(elementId, button = null) {
+        const text = document.getElementById(elementId).textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            if (button) {
+                const originalText = button.textContent;
+                button.textContent = "Copied!";
+                setTimeout(() => button.textContent = originalText, 1000);
+            }
+        });
+    }
+
+    function downloadAllImages() {
+        if (!configReady) {
+            alert('Configuration not loaded yet. Please wait.');
+            return;
+        }
+        window.location.href = `/${imageEndpointPrefix}/download-all`;
+    }
+</script>
+
+</body>
+</html>
