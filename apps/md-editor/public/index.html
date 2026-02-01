@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Markdown Editor</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="progress-container"><div id="progress-bar"></div></div>
+
+    <header>
+        <div style="display: flex; align-items: center;">
+            <button id="toggleSidebarBtn" class="icon-btn">☰</button>
+            <h1 style="margin-left: 15px; margin-right: 20px;">Live Editor</h1>
+            
+            <div class="session-control">
+                <input type="text" id="sessionInput" placeholder="Session Key (UUID)" spellcheck="false">
+                <button id="sessionLoadBtn" title="Load Session">➜</button>
+            </div>
+        </div>
+        <div class="toolbar">
+            <button id="saveBtn" style="background: var(--color-mint); color: #1a1418;">💾 Save</button>
+            <button id="themeBtn">☀ Light Mode</button>
+            <button id="downloadZipBtn" class="primary">⬇ Download Zip</button>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <aside class="sidebar" id="sidebar">
+            <div id="dropZone" class="upload-section">
+                <div class="drop-message">
+                    📂 <strong>Drag Folder Here</strong><br>
+                    (e.g., MyProject/)
+                </div>
+                <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none">
+            </div>
+
+            <div id="fileExplorer" class="file-list">
+                <div class="empty-msg">No files uploaded.</div>
+            </div>
+        </aside>
+
+        <div class="resizer" id="sidebarResizer"></div>
+
+        <div class="container" id="mainContainer">
+            <div class="editor-wrapper" id="editorWrapper">
+                <div id="lineNumbers" class="line-numbers"></div>
+                <textarea id="editor" placeholder="# Drag a folder to start..." spellcheck="false"></textarea>
+                <div id="mirror"></div>
+            </div>
+            
+            <div class="resizer" id="resizer"></div>
+            
+            <div id="preview"></div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <div id="modalOverlay" class="modal-overlay hidden">
+        <div class="modal-box">
+            <h3 id="modalTitle">Title</h3>
+            <p id="modalMessage">Message body goes here.</p>
+            <input type="text" id="modalInput" class="modal-input hidden" spellcheck="false">
+            <div class="modal-actions">
+                <button id="modalCancelBtn" class="secondary">Cancel</button>
+                <button id="modalConfirmBtn" class="primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="lightbox" class="lightbox"></div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
