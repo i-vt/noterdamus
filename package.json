@@ -10,7 +10,8 @@
     
     "start:image": "cross-env-shell PORT=$PORT_IMAGE npm run start --workspace=apps/image-saver",
     "start:pdf":   "cross-env-shell PORT=$PORT_PDF   npm run start --workspace=apps/pdf-annotator",
-    "start:news":  "cross-env-shell PORT=$PORT_NEWS  npm run start --workspace=apps/newsboat-ui"
+    "start:news":  "cross-env-shell PORT=$PORT_NEWS  npm run start --workspace=apps/newsboat-ui",
+    "start:md":  "cross-env-shell PORT=$PORT_MD  npm run start --workspace=apps/md-editor"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
