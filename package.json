@@ -6,7 +6,7 @@
     "apps/*"
   ],
   "scripts": {
-    "start": "dotenv -- concurrently \"npm run start:image\" \"npm run start:pdf\" \"npm run start:news\"",
+    "start": "dotenv -- concurrently \"npm run start:image\" \"npm run start:pdf\" \"npm run start:news\" \"npm run start:md\"",
     
     "start:image": "cross-env-shell PORT=$PORT_IMAGE npm run start --workspace=apps/image-saver",
     "start:pdf":   "cross-env-shell PORT=$PORT_PDF   npm run start --workspace=apps/pdf-annotator",
