@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Live Shared Text + Files</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root {
+  color-scheme: light dark;
+  --bg-light: #fafafa;
+  --bg-dark: #121212;
+  --text-light: #111;
+  --text-dark: #f0f0f0;
+  --border-light: #ccc;
+  --border-dark: #444;
+}
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  transition: background 0.2s, color 0.2s;
+}
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+header .left { display: flex; align-items: center; gap: 12px; }
+header .right { display: flex; align-items: center; gap: 8px; }
+main { padding: 16px; }
+textarea {
+  width: 100%; height: 60vh;
+  padding: 15px; box-sizing: border-box; resize: none;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg2); color: inherit;
+  font-family: monospace; font-size: 14px; line-height: 1.5;
+}
+#fileList { list-style: none; padding: 0; margin-top: 10px; }
+#fileList li { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding: 8px 0; }
+button { padding: 6px 12px; cursor: pointer; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: inherit; }
+input[type=file] { display: none; }
+label.upload-btn {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--bg2);
+}
+label.upload-btn:hover, button:hover { opacity: 0.8; }
+body.light {
+  background: var(--bg-light);
+  color: var(--text-light);
+  --border: var(--border-light);
+  --bg2: #fff;
+}
+body.dark {
+  background: var(--bg-dark);
+  color: var(--text-dark);
+  --border: var(--border-dark);
+  --bg2: #1e1e1e;
+}
+.theme-toggle { background: transparent; }
+input#roomCode {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: inherit;
+  width: 100px;
+}
+</style>
+</head>
+<body>
+  <header>
+    <div class="left">
+      <strong>📝 Live Editor</strong>
+      <button id="newRoomBtn" title="Create Random Room">➕ New</button>
+      <input id="roomCode" placeholder="Code..." maxlength="8">
+      <button id="joinRoomBtn">➡️ Join</button>
+    </div>
+    <div class="right">
+      <label class="upload-btn" for="fileInput">📤 Upload</label>
+      <input id="fileInput" type="file">
+      <button id="themeBtn" class="theme-toggle">🌙</button>
+    </div>
+  </header>
+
+  <main>
+    <textarea id="editor" placeholder="Type here to sync text..."></textarea>
+    <h3 style="margin-top: 20px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">📁 Shared Files</h3>
+    <ul id="fileList"></ul>
+  </main>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const room = params.get("room") || "main";
+const editor = document.getElementById("editor");
+const fileInput = document.getElementById("fileInput");
+const fileList = document.getElementById("fileList");
+const themeBtn = document.getElementById("themeBtn");
+const newRoomBtn = document.getElementById("newRoomBtn");
+const joinRoomBtn = document.getElementById("joinRoomBtn");
+const roomCodeInput = document.getElementById("roomCode");
+
+// Set room code input to current room
+if (params.get("room")) roomCodeInput.value = params.get("room");
+
+// --- Room Controls ---
+newRoomBtn.onclick = () => {
+  const id = Math.random().toString(36).substring(2, 8);
+  location.href = "/room?room=" + id;
+};
+
+joinRoomBtn.onclick = () => {
+  const code = roomCodeInput.value.trim();
+  if (code) location.href = "/room?room=" + code;
+};
+
+// --- Socket ---
+const socket = io({ transports: ["websocket", "polling"] });
+
+// --- Text sync ---
+socket.on("connect", () => socket.emit("join", { room }));
+
+socket.on("text:sync", ({ text }) => {
+    // Only update if different to avoid cursor jumps on slow connections
+    if (editor.value !== text) {
+        editor.value = text;
+    }
+});
+
+editor.addEventListener("input", () => {
+    socket.emit("text:update", { room, text: editor.value });
+});
+
+// --- Files sync ---
+socket.on("files:update", renderFiles);
+
+function renderFiles(files = []) {
+  fileList.innerHTML = "";
+  if (files.length === 0) {
+      fileList.innerHTML = "<li style='border:none; color: #888; font-style: italic;'>No files uploaded yet.</li>";
+      return;
+  }
+  files.forEach(f => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <div style="flex:1">
+          <a href="${f.url}" target="_blank" style="color: inherit; font-weight: bold; text-decoration: none;">${f.name}</a>
+          <span style="opacity: 0.7; font-size: 0.9em; margin-left: 8px;">(${(f.size/1024).toFixed(1)} KB)</span>
+      </div>
+      <button data-id="${f.id}" class="delBtn" title="Delete File" style="border-color: #ff4444; color: #ff4444;">✕</button>
+    `;
+    fileList.appendChild(li);
+  });
+  
+  fileList.querySelectorAll(".delBtn").forEach(btn => {
+    btn.onclick = async () => {
+      if(confirm("Delete this file?")) {
+        await fetch("/delete/" + room + "/" + btn.dataset.id, { method: "DELETE" });
+      }
+    };
+  });
+}
+
+// --- Upload ---
+fileInput.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const originalText = document.querySelector("label[for=fileInput]").innerText;
+  document.querySelector("label[for=fileInput]").innerText = "⏳...";
+  
+  const form = new FormData();
+  form.append("file", file);
+  
+  try {
+      await fetch("/upload/" + room, { method: "POST", body: form });
+  } catch(e) {
+      alert("Upload failed");
+  } finally {
+      document.querySelector("label[for=fileInput]").innerText = originalText;
+      fileInput.value = "";
+  }
+});
+
+// --- THEME LOGIC ---
+function setTheme(theme) {
+  document.body.classList.remove("dark", "light");
+  document.body.classList.add(theme);
+  document.cookie = "theme=" + theme + "; path=/; max-age=31536000";
+  themeBtn.textContent = theme === "dark" ? "🌙" : "☀️";
+}
+
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : null;
+}
+
+function loadTheme() {
+  const saved = getCookie("theme");
+  setTheme(saved || "dark"); // default dark
+}
+
+themeBtn.addEventListener("click", () => {
+  const current = document.body.classList.contains("dark") ? "dark" : "light";
+  const next = current === "dark" ? "light" : "dark";
+  setTheme(next);
+});
+
+loadTheme();
+</script>
+</body>
+</html>

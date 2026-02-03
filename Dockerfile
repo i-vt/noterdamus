@@ -24,6 +24,7 @@ COPY apps/image-saver/package.json ./apps/image-saver/
 COPY apps/md-editor/package.json ./apps/md-editor/
 COPY apps/newsboat-ui/package.json ./apps/newsboat-ui/
 COPY apps/pdf-annotator/package.json ./apps/pdf-annotator/
+COPY apps/shared-editor/package.json ./apps/shared-editor/
 
 # 5. Install Dependencies (from root, handling workspaces)
 RUN npm install
@@ -32,8 +33,8 @@ RUN npm install
 COPY . .
 
 # 7. Expose ports defined in your .env
-# Image Saver (24043), PDF (24044), News (24045), MD (24046)
-EXPOSE 24043 24044 24045 24046
+# Image Saver (24043), PDF (24044), News (24045), MD (24046), Editor (24047)
+EXPOSE 24043 24044 24045 24046 24047
 
 # 8. Start the application
 # Note: You may want to update package.json to include "start:md" in the main start command

@@ -12,6 +12,7 @@ services:
       - "24044:24044" # PDF Annotator
       - "24045:24045" # Newsboat UI
       - "24046:24046" # MD Editor
+      - "24047:24047" # MD Editor
     
     # Environment variables
     env_file:
@@ -34,7 +35,8 @@ services:
       # 4. MD Editor Sessions
       # The MD Editor saves files to /tmp. We map this to persist sessions across restarts.
       - ./data/tmp-sessions:/tmp
-
+      # 5. Shared Editor Uploads
+      - ./data/shared-uploads:/app/apps/shared-editor/uploads
     # (Optional) If you want to run the MD Editor as well, override the command
     # because the default 'npm start' in your package.json assumes only 3 apps.
     # command: >
