@@ -1,0 +1,9 @@
+node_modules
+apps/*/node_modules
+.git
+.DS_Store
+*.log
+# Don't copy local databases or large uploads into the image
+apps/newsboat-ui/assets/*.jpg
+apps/newsboat-ui/assets/*.md
+local-upload-dir/
