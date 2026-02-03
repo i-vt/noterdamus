@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  noterdamus:
+    build: .
+    container_name: noterdamus
+    restart: unless-stopped
+    
+    # Map the ports from your .env file
+    ports:
+      - "24043:24043" # Image Saver
+      - "24044:24044" # PDF Annotator
+      - "24045:24045" # Newsboat UI
+      - "24046:24046" # MD Editor
+    
+    # Environment variables
+    env_file:
+      - .env
+    
+    # Persistence Configuration
+    volumes:
+      # 1. Newsboat Database Persistence
+      # The app looks for DB in ~/.local/share/newsboat/. We map a local folder to it.
+      - ./data/newsboat:/root/.local/share/newsboat
+      
+      # 2. Image Saver Uploads
+      # Persist images uploaded via the clipboard tool
+      - ./data/uploads:/app/local-upload-dir
+      
+      # 3. Newsboat Assets (Screenshots/Markdown)
+      # Persist the crawled assets
+      - ./data/assets:/app/apps/newsboat-ui/assets
+
+      # 4. MD Editor Sessions
+      # The MD Editor saves files to /tmp. We map this to persist sessions across restarts.
+      - ./data/tmp-sessions:/tmp
+
+    # (Optional) If you want to run the MD Editor as well, override the command
+    # because the default 'npm start' in your package.json assumes only 3 apps.
+    # command: >
+    #   npx concurrently 
+    #   "npm run start:image" 
+    #   "npm run start:pdf" 
+    #   "npm run start:news" 
+    #   "npm run start:md"
