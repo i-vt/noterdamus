@@ -123,7 +123,7 @@ export async function exportCurrentPageImage() {
             
             const maxWidth = viewport.width - (padding * 2);
             
-            // FIX: Split by paragraphs first to preserve newlines
+            // Split by paragraphs first to preserve newlines
             const paragraphs = fullText.split('\n');
             const lines = [];
 
@@ -198,17 +198,49 @@ export async function exportCurrentPageImage() {
     a.click();
 }
 
-// --- Searchable PDF Export (Fixed: Preserves Newlines) ---
+// --- Searchable PDF Export (Fixed: Supports Unicode/Emojis) ---
+
+// Helper to dynamically load fontkit if missing
+async function loadFontkit() {
+    if (window.fontkit) return;
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Could not load fontkit"));
+        document.head.appendChild(script);
+    });
+}
+
 export async function downloadSearchablePDF() {
     if (!state.pdfBytes) return alert("No PDF loaded");
 
-    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    // 1. Ensure dependencies are loaded
+    try {
+        await loadFontkit();
+    } catch (e) {
+        alert("Error: Could not load font engine. Check internet connection.");
+        return;
+    }
+
+    const { PDFDocument, rgb } = window.PDFLib;
     
-    // Load the EXISTING document
+    // 2. Load the PDF & Register Fontkit
     const pdfDoc = await PDFDocument.load(state.pdfBytes);
-    
-    // Embed font
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    pdfDoc.registerFontkit(window.fontkit);
+
+    // 3. Fetch and Embed a Unicode Font (Ubuntu-R)
+    // This supports many languages and prevents the 'WinAnsi' crash for emojis.
+    // Note: To support CJK (Chinese/Japanese) specifically, replace this URL with a CJK font (e.g. Noto Sans SC).
+    let font;
+    try {
+        const fontBytes = await fetch('https://pdf-lib.js.org/assets/ubuntu/Ubuntu-R.ttf').then(res => res.arrayBuffer());
+        font = await pdfDoc.embedFont(fontBytes);
+    } catch (e) {
+        console.warn("Custom font fetch failed. Falling back to Helvetica (may crash on special chars).");
+        font = await pdfDoc.embedFont(window.PDFLib.StandardFonts.Helvetica);
+    }
+
     const fontSize = 10;
     const lineHeight = 12;
     const padding = 20;
@@ -225,7 +257,7 @@ export async function downloadSearchablePDF() {
         
         const hasNotes = data.notes && data.notes.length > 0;
         
-        // 1. Calculate Footer Content
+        // 4. Calculate Footer Content
         let footerHeight = 0;
         let noteLines = [];
 
@@ -235,9 +267,12 @@ export async function downloadSearchablePDF() {
 
             for (let nIdx = 0; nIdx < data.notes.length; nIdx++) {
                 const note = data.notes[nIdx];
-                const content = `[${nIdx + 1}] ${note.content || "(No content)"}`;
                 
-                // FIX: Split by newlines first
+                // Replace tabs with spaces (tabs still cause measurement issues)
+                // We NO LONGER strip emojis or foreign characters.
+                const safeText = (note.content || "(No content)").replace(/\t/g, '    ');
+                const content = `[${nIdx + 1}] ${safeText}`;
+                
                 const paragraphs = content.split('\n');
                 
                 for (const paragraph of paragraphs) {
@@ -256,7 +291,6 @@ export async function downloadSearchablePDF() {
                             line = testLine;
                         }
                     }
-                    // Push the last line of the paragraph
                     noteLines.push({ text: line });
                     footerHeight += lineHeight;
                 }
@@ -264,7 +298,7 @@ export async function downloadSearchablePDF() {
             footerHeight += padding * 2;
         }
 
-        // 2. Expand Page if needed (Modify MediaBox)
+        // 5. Expand Page if needed (Modify MediaBox)
         if (footerHeight > 0) {
             const mb = page.getMediaBox();
             
@@ -297,7 +331,7 @@ export async function downloadSearchablePDF() {
             }
         }
 
-        // 3. Draw Annotations on top
+        // 6. Draw Annotations on top
         drawAnnotationsOnPDF(page, data, width, height, rgb, font);
     }
 
@@ -350,7 +384,10 @@ function drawAnnotationsOnPDF(pdfPage, data, w, h, rgb, font) {
             
             // Number
             const numStr = (idx+1).toString();
-            const textWidth = font.widthOfTextAtSize(numStr, 10);
+            // Use fallback width if measure fails
+            let textWidth = 6;
+            try { textWidth = font.widthOfTextAtSize(numStr, 10); } catch(e){}
+
             pdfPage.drawText(numStr, {
                 x: nx - (textWidth/2),
                 y: ny - 3.5, 
